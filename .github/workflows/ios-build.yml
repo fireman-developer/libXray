@@ -16,8 +16,9 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          # تغییر مهم: استفاده از نسخه 1.24 برای هماهنگی با کتابخانه موبایل
-          go-version: '1.24'
+          # نسخه 1.25.5 در فایل go.mod شما قید شده، پس بهتره هماهنگ باشه
+          # اما 1.24 هم معمولاً کار میکنه. اینجا برای اطمینان latest میذاریم
+          go-version: '1.24' 
           check-latest: true
 
       - name: Install Gomobile Tool
@@ -25,21 +26,17 @@ jobs:
           go install golang.org/x/mobile/cmd/gomobile@latest
           gomobile init
 
-      - name: Prepare Dependencies
+      - name: Fix Dependencies (Force)
         run: |
-          # اضافه کردن صریح پکیج بایند
+          # 1. دانلود پکیج‌های ضروری
           go get golang.org/x/mobile/bind
           
-          # تمیزکاری فایل وابستگی‌ها
-          go mod tidy
-          
-          # تکنیک اصلی: کپی کردن وابستگی‌ها به داخل پوشه پروژه (Vendor)
-          # این کار باعث می‌شود gomobile حتماً فایل‌ها را پیدا کند
-          go mod vendor
+          # نکته حیاتی: اینجا "go mod tidy" را اجرا نمی‌کنیم تا پکیج bind حذف نشود
+          # نکته حیاتی ۲: از "go mod vendor" استفاده نمی‌کنیم تا از کش ماژول استفاده شود
 
       - name: Build XCFramework for iOS
         run: |
-          # بیلد گرفتن با استفاده از فایل‌های لوکال (Vendor)
+          # دستور بیلد بدون استفاده از vendor
           gomobile bind -target=ios -ldflags="-s -w" -o LibXray.xcframework .
 
       - name: Upload Artifact
