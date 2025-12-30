@@ -1,0 +1,69 @@
+name: Build Windows
+
+on:
+  workflow_dispatch: # امکان اجرای دستی
+  push:
+    tags:
+      - "v*" # اجرا فقط زمانی که یک تگ (مثل v1.0) پوش شود
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25' # هماهنگ با نسخه go.mod شما
+          check-latest: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install MinGW
+        # اسکریپت بیلد شما به gcc.exe نیاز دارد
+        uses: egor-tensin/setup-mingw@v2
+        with:
+          platform: x64
+
+      - name: Build Library and Desktop Bin
+        run: |
+          # اجرای اسکریپت بیلد برای ویندوز
+          python build/main.py windows
+
+      - name: Prepare Artifacts
+        run: |
+          # ایجاد پوشه برای جمع‌آوری خروجی‌ها
+          mkdir release_output
+          copy windows_dll\libXray.dll release_output\
+          copy windows_dll\libXray.h release_output\
+          # اگر فایل اجرایی دسکتاپ هم تولید شده باشد، آن را کپی می‌کنیم
+          if (Test-Path bin\xray.exe) { copy bin\xray.exe release_output\ }
+
+      - name: Zip Release
+        uses: thedoctor0/zip-release@0.7.6
+        with:
+          type: 'zip'
+          filename: 'libXray-windows.zip'
+          directory: 'release_output'
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') # فقط اگر تگ زده شده باشد آپلود می‌کند
+        with:
+          files: release_output/libXray-windows.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Artifact (Fallback)
+        # اگر بیلد دستی بود و ریلیز نبود، فایل را در بخش Artifacts نگه دار
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        uses: actions/upload-artifact@v4
+        with:
+          name: libXray-windows
+          path: release_output/libXray-windows.zip
