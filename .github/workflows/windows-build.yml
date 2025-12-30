@@ -1,10 +1,10 @@
 name: Build Windows
 
 on:
-  workflow_dispatch: # امکان اجرای دستی
+  workflow_dispatch:
   push:
     tags:
-      - "v*" # اجرا فقط زمانی که یک تگ (مثل v1.0) پوش شود
+      - "v*"
 
 jobs:
   build-windows:
@@ -17,7 +17,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25' # هماهنگ با نسخه go.mod شما
+          go-version: '1.25'
           check-latest: true
 
       - name: Setup Python
@@ -25,24 +25,31 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install MinGW
-        # اسکریپت بیلد شما به gcc.exe نیاز دارد
-        uses: egor-tensin/setup-mingw@v2
-        with:
-          platform: x64
+      - name: Install MinGW manually
+        run: |
+          # نصب MinGW بدون استفاده از اکشن egor-tensin که خطا داشت
+          choco install mingw -y --no-progress
+          # اضافه کردن مسیر باینری MinGW به متغیر محیطی PATH
+          echo "C:\ProgramData\mingw64\mingw64\bin" >> $env:GITHUB_PATH
+
+      - name: Verify GCC
+        run: |
+          # اطمینان از نصب صحیح
+          gcc --version
 
       - name: Build Library and Desktop Bin
         run: |
-          # اجرای اسکریپت بیلد برای ویندوز
           python build/main.py windows
 
       - name: Prepare Artifacts
         run: |
-          # ایجاد پوشه برای جمع‌آوری خروجی‌ها
           mkdir release_output
-          copy windows_dll\libXray.dll release_output\
-          copy windows_dll\libXray.h release_output\
-          # اگر فایل اجرایی دسکتاپ هم تولید شده باشد، آن را کپی می‌کنیم
+          
+          # کپی فایل‌های DLL و Header
+          if (Test-Path windows_dll\libXray.dll) { copy windows_dll\libXray.dll release_output\ }
+          if (Test-Path windows_dll\libXray.h) { copy windows_dll\libXray.h release_output\ }
+          
+          # کپی فایل اجرایی اگر وجود داشته باشد
           if (Test-Path bin\xray.exe) { copy bin\xray.exe release_output\ }
 
       - name: Zip Release
@@ -54,14 +61,13 @@ jobs:
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/') # فقط اگر تگ زده شده باشد آپلود می‌کند
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: release_output/libXray-windows.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Artifact (Fallback)
-        # اگر بیلد دستی بود و ریلیز نبود، فایل را در بخش Artifacts نگه دار
         if: "!startsWith(github.ref, 'refs/tags/')"
         uses: actions/upload-artifact@v4
         with:
